@@ -17,7 +17,6 @@ const io = new Server(server, {
 
 let rooms = [{ name: 'General', members: 0 }];
 
-// Add a simple GET route so the server responds
 app.get('/', (req, res) => {
   res.send('Chat server is running! 🚀');
 });
@@ -48,6 +47,7 @@ io.on('connection', (socket) => {
   
   socket.on('send_message', ({ room, sender, text }) => {
     console.log(`💬 Message from ${sender} in ${room}: ${text}`);
+    // Send to everyone in the room INCLUDING the sender
     io.to(room).emit('message', { sender, text });
   });
   
@@ -64,6 +64,16 @@ io.on('connection', (socket) => {
   socket.on('delete_room', ({ name }) => {
     console.log(`🗑️ Deleting room: ${name}`);
     if (name !== 'General') {
+      // Force everyone out of the room
+      const socketsInRoom = io.sockets.adapter.rooms.get(name);
+      if (socketsInRoom) {
+        socketsInRoom.forEach(socketId => {
+          const sock = io.sockets.sockets.get(socketId);
+          if (sock) {
+            sock.leave(name);
+          }
+        });
+      }
       rooms = rooms.filter(r => r.name !== name);
       updateRoomMembers();
       io.emit('room_updated');
